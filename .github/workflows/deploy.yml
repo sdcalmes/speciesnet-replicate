@@ -1,0 +1,80 @@
+name: Deploy to Replicate
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag for deployment'
+        required: true
+        default: 'latest'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Cog
+      run: |
+        sudo curl -o /usr/local/bin/cog -L https://github.com/replicate/cog/releases/latest/download/cog_Linux_x86_64
+        sudo chmod +x /usr/local/bin/cog
+    
+    - name: Authenticate with Replicate
+      env:
+        REPLICATE_API_TOKEN: ${{ secrets.REPLICATE_API_TOKEN }}
+      run: |
+        echo $REPLICATE_API_TOKEN | cog login --stdin
+    
+    - name: Build and push to Replicate
+      env:
+        REPLICATE_API_TOKEN: ${{ secrets.REPLICATE_API_TOKEN }}
+      run: |
+        # Extract version from tag or use input
+        if [[ $GITHUB_REF == refs/tags/* ]]; then
+          VERSION=${GITHUB_REF#refs/tags/}
+        else
+          VERSION=${{ github.event.inputs.version }}
+        fi
+        
+        echo "Deploying version: $VERSION"
+        
+        # Push to Replicate
+        cog push r8.im/${{ github.repository_owner }}/speciesnet:$VERSION
+        
+        # Also tag as latest if this is a release
+        if [[ $VERSION =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          cog push r8.im/${{ github.repository_owner }}/speciesnet:latest
+        fi
+    
+    - name: Create GitHub Release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ github.ref }}
+        body: |
+          SpeciesNet model deployment ${{ github.ref }}
+          
+          This release has been automatically deployed to Replicate.
+          
+          **Usage:**
+          ```python
+          import replicate
+          
+          output = replicate.run(
+              "${{ github.repository_owner }}/speciesnet:${{ github.ref }}",
+              input={
+                  "image": "https://example.com/camera-trap-image.jpg",
+                  "confidence_threshold": 0.1,
+                  "country_code": "USA"
+              }
+          )
+          ```
+        draft: false
+        prerelease: false

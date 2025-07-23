@@ -1,0 +1,17 @@
+build:
+  gpu: true
+  cuda: "11.8"
+  python_version: "3.10"
+  python_requirements: "requirements.txt"
+  system_packages:
+    - "libgl1-mesa-glx"
+    - "libglib2.0-0"
+  run:
+    - "mkdir -p /tmp/weights && cd /tmp/weights"
+    - "python -c \"from PIL import Image; import json; img = Image.new('RGB', (64, 64), 'green'); img.save('/tmp/weights/test.jpg'); json.dump({'instances': [{'filepath': '/tmp/weights/test.jpg'}]}, open('/tmp/weights/input.json', 'w'))\""
+    - "python -m speciesnet.scripts.run_model --instances_json /tmp/weights/input.json --predictions_json /tmp/weights/out1.json --model kaggle:google/speciesnet/pyTorch/v4.0.1a || true"
+    - "python -m speciesnet.scripts.run_model --instances_json /tmp/weights/input.json --predictions_json /tmp/weights/out2.json --model kaggle:google/speciesnet/pyTorch/v4.0.1b || true"
+    - "echo 'SpeciesNet models pre-downloaded!'"
+
+predict: "predict.py:Predictor"
+image: "r8.im/sdcalmes/speciesnet-v4.0.1a"
