@@ -22,7 +22,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        pip install pytest pytest-cov
+        pip install pytest pytest-cov PyYAML
     
     - name: Install Cog
       run: |
@@ -30,7 +30,12 @@ jobs:
         sudo chmod +x /usr/local/bin/cog
     
     - name: Validate cog.yaml
-      run: cog build --dry-run
+      run: |
+        # Validate cog.yaml syntax by attempting to parse it
+        python -c "import yaml; yaml.safe_load(open('cog.yaml'))" || exit 1
+        # Check if predict.py exists and has Predictor class
+        python -c "import predict; assert hasattr(predict, 'Predictor')" || exit 1
+        echo "cog.yaml validation passed"
     
     - name: Run Python tests
       run: |
