@@ -27,7 +27,7 @@ jobs:
       env:
         REPLICATE_API_TOKEN: ${{ secrets.REPLICATE_API_TOKEN }}
       run: |
-        echo $REPLICATE_API_TOKEN | cog login --stdin
+        echo $REPLICATE_API_TOKEN | cog login --token-stdin
     
     - name: Build and push to Replicate
       env:
