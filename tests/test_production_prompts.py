@@ -24,7 +24,7 @@ class TestProductionPrompts:
     def test_predictor_prompt_handling(self, test_image):
         """Test that our production predictor handles prompts correctly."""
         # Import our test predictor (avoids Cog dependency issues)
-        from test_predict import TestPredictor
+        from .test_predict import TestPredictor
         
         predictor = TestPredictor()
         predictor.setup()
