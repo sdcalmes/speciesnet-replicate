@@ -39,14 +39,110 @@ class Predictor(BasePredictor):
             print("SETUP: CUDA not available, using CPU", flush=True)
             sys.stderr.write("STDERR: CUDA not available, using CPU\n")
         
+        # Pre-load SpeciesNet models into memory
+        print("SETUP: Pre-loading SpeciesNet models...", flush=True)
+        try:
+            import tempfile
+            
+            # Create a test image and input JSON for model pre-loading
+            temp_dir = Path(tempfile.mkdtemp())
+            test_image_path = temp_dir / "test_preload.jpg"
+            test_input_path = temp_dir / "test_input.json"
+            test_output_path = temp_dir / "test_output.json"
+            
+            # Create minimal test image
+            from PIL import Image
+            test_img = Image.new('RGB', (64, 64), 'green')
+            test_img.save(test_image_path)
+            
+            # Create input JSON
+            test_input = {"instances": [{"filepath": str(test_image_path)}]}
+            with open(test_input_path, 'w') as f:
+                json.dump(test_input, f)
+            
+            # Pre-load v4.0.1a model
+            print("SETUP: Pre-loading v4.0.1a model...", flush=True)
+            import subprocess
+            env = os.environ.copy()
+            env.update({
+                'PYTHONUNBUFFERED': '1',
+                'SPECIESNET_AUTO_CONFIRM': '1',
+                'NO_INTERACTIVE': '1',
+                'CUDA_VISIBLE_DEVICES': '0',
+                'TORCH_USE_CUDA_DSA': '1',
+                'PYTORCH_CUDA_ALLOC_CONF': 'max_split_size_mb:512',
+            })
+            
+            cmd_v4_0_1a = [
+                "python", "-m", "speciesnet.scripts.run_model",
+                "--instances_json", str(test_input_path),
+                "--predictions_json", str(test_output_path),
+                "--model", "kaggle:google/speciesnet/pyTorch/v4.0.1a",
+            ]
+            
+            result = subprocess.run(
+                cmd_v4_0_1a,
+                capture_output=True,
+                text=True,
+                timeout=120,
+                check=False,
+                input="y\ny\ny\ny\n",
+                env=env
+            )
+            
+            if result.returncode == 0:
+                print("SETUP: v4.0.1a model pre-loaded successfully", flush=True)
+            else:
+                print(f"SETUP: v4.0.1a pre-load warning: {result.stderr[:200]}", flush=True)
+            
+            # Pre-load v4.0.1b model
+            print("SETUP: Pre-loading v4.0.1b model...", flush=True)
+            test_output_path_b = temp_dir / "test_output_b.json"
+            
+            cmd_v4_0_1b = [
+                "python", "-m", "speciesnet.scripts.run_model",
+                "--instances_json", str(test_input_path),
+                "--predictions_json", str(test_output_path_b),
+                "--model", "kaggle:google/speciesnet/pyTorch/v4.0.1b",
+            ]
+            
+            result = subprocess.run(
+                cmd_v4_0_1b,
+                capture_output=True,
+                text=True,
+                timeout=120,
+                check=False,
+                input="y\ny\ny\ny\n",
+                env=env
+            )
+            
+            if result.returncode == 0:
+                print("SETUP: v4.0.1b model pre-loaded successfully", flush=True)
+            else:
+                print(f"SETUP: v4.0.1b pre-load warning: {result.stderr[:200]}", flush=True)
+            
+            # Cleanup test files
+            import shutil
+            shutil.rmtree(temp_dir)
+            
+            # Check GPU memory usage after pre-loading
+            if torch.cuda.is_available():
+                allocated = torch.cuda.memory_allocated(0) / 1024**2
+                cached = torch.cuda.memory_reserved(0) / 1024**2
+                print(f"SETUP: GPU Memory after pre-loading: {allocated:.1f} MB allocated, {cached:.1f} MB cached", flush=True)
+            
+        except Exception as e:
+            print(f"SETUP: Model pre-loading failed: {e}", flush=True)
+            print("SETUP: Will fall back to loading models on-demand", flush=True)
+        
         sys.stderr.flush()
         print("SETUP: Model setup complete", flush=True)
     
     def _load_model_if_needed(self, model_version: str):
         """Load model on demand if not already loaded."""
-        # SpeciesNet 5.0.0 is used via command-line interface, models load automatically
-        # This method is kept for compatibility but doesn't need to preload models
-        print(f"SpeciesNet will load model {model_version} automatically when needed")
+        # Models should already be pre-loaded during setup()
+        # This method is kept for compatibility
+        print(f"Using pre-loaded SpeciesNet model {model_version}")
     
     def predict(
         self,
@@ -93,8 +189,14 @@ class Predictor(BasePredictor):
         print("PREDICT: Starting prediction")
         print(f"PREDICT: Model version: {model_version}, Run mode: {run_mode}")
         
-        # Load model if needed
+        # Models should already be pre-loaded during setup()
         self._load_model_if_needed(model_version)
+        
+        # Log current GPU memory usage
+        if torch.cuda.is_available():
+            allocated = torch.cuda.memory_allocated(0) / 1024**2
+            cached = torch.cuda.memory_reserved(0) / 1024**2
+            print(f"PREDICT: GPU Memory at start: {allocated:.1f} MB allocated, {cached:.1f} MB cached")
         
         print("PREDICT: Creating temporary directory")
         
