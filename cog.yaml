@@ -14,4 +14,4 @@ build:
     - "echo 'SpeciesNet models pre-downloaded!'"
 
 predict: "predict.py:Predictor"
-image: "r8.im/sdcalmes/speciesnet-v4.0.1a"
+image: "r8.im/sdcalmes/speciesnet"
